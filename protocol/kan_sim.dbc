@@ -1,0 +1,22 @@
+VERSION "Kan_sim private bench protocol v1 - not Hyundai"
+
+NS_ :
+    CM_
+    VAL_
+
+BS_:
+
+BU_: Simulator Receiver
+
+BO_ 801 VehicleSignals: 8 Simulator
+ SG_ Version : 0|8@1+ (1,0) [1|1] "" Receiver
+ SG_ Turn : 8|2@1+ (1,0) [0|3] "" Receiver
+ SG_ Reverse : 10|1@1+ (1,0) [0|1] "" Receiver
+ SG_ Brake : 11|1@1+ (1,0) [0|1] "" Receiver
+ SG_ Speed : 16|16@1+ (0.1,0) [0|200] "km/h" Receiver
+ SG_ Counter : 32|8@1+ (1,0) [0|255] "" Receiver
+
+VAL_ 801 Turn 0 "Off" 1 "Left" 2 "Right" 3 "Hazard";
+VAL_ 801 Reverse 0 "Off" 1 "On";
+VAL_ 801 Brake 0 "Off" 1 "On";
+CM_ BO_ 801 "Private bench data, 100 ms period. Reserved bits must be zero. Stopped when Speed=0; stale after 500 ms is unknown.";
