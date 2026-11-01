@@ -10,6 +10,9 @@ static String input;
 static bool overflow = false, fresh = false;
 static bool transmitting = true, streaming = false;
 static uint32_t lastStream = 0;
+// Dedicated CAN simulator board: avoid boot strapping pins for the transceiver.
+static constexpr gpio_num_t CAN_TX_PIN = GPIO_NUM_18;
+static constexpr gpio_num_t CAN_RX_PIN = GPIO_NUM_19;
 
 void printState(const VehicleState &s) {
     Serial.printf("STATE turn=%u reverse=%u brake=%u speed=%.1f stopped=%u\n",
@@ -63,7 +66,7 @@ void command(String line) {
 void setup() {
     Serial.begin(115200);
     input.reserve(80);
-    twai_general_config_t general = TWAI_GENERAL_CONFIG_DEFAULT(GPIO_NUM_5, GPIO_NUM_4, TWAI_MODE_NORMAL);
+    twai_general_config_t general = TWAI_GENERAL_CONFIG_DEFAULT(CAN_TX_PIN, CAN_RX_PIN, TWAI_MODE_NORMAL);
     general.alerts_enabled = TWAI_ALERT_BUS_OFF | TWAI_ALERT_BUS_RECOVERED |
                             TWAI_ALERT_TX_FAILED | TWAI_ALERT_TX_SUCCESS;
     twai_timing_config_t timing = TWAI_TIMING_CONFIG_500KBITS();
@@ -71,13 +74,13 @@ void setup() {
     esp_err_t err = twai_driver_install(&general, &timing, &filter);
     if (err == ESP_OK) err = twai_start();
     ready = err == ESP_OK;
-    Serial.printf("KAN_SIM %s init=%s, 500 kbit/s TX=5 RX=4\n",
+    Serial.printf("KAN_SIM %s init=%s, 500 kbit/s TX=%d RX=%d\n",
 #ifdef KAN_RECEIVER
                   "receiver",
 #else
                   "sender",
 #endif
-                  esp_err_to_name(err));
+                  esp_err_to_name(err), int(CAN_TX_PIN), int(CAN_RX_PIN));
 #ifdef KAN_RECEIVER
     Serial.println("UNKNOWN: waiting for first valid vehicle frame");
 #endif

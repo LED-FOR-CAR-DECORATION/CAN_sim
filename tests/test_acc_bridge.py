@@ -31,13 +31,13 @@ class AccTests(unittest.TestCase):
 
     def test_reverse_hazard_and_atomic_command(self):
         state = Mapper().convert(*snapshot(speed=5.5, brake=0.5, gear=0, left=1, right=1))
-        self.assertEqual(serial_frame(state), b"FRAME 55 15\n")
-        self.assertEqual(state.frame(0), bytes.fromhex("01 0F 37 00 00 00 00 00"))
+        self.assertEqual(serial_frame(state), b"FRAME 55 7\n")
+        self.assertEqual(state.frame(0), bytes.fromhex("01 07 37 00 00 00 00 00"))
 
-    def test_brake_hysteresis(self):
+    def test_brake_is_not_forwarded(self):
         mapper = Mapper()
         for brake, expected in [(0.01, False), (0.1, True), (0.03, True), (0.01, False)]:
-            self.assertEqual(mapper.convert(*snapshot(brake=brake)).brake, expected)
+            self.assertFalse(mapper.convert(*snapshot(brake=brake)).brake)
 
     def test_speed_threshold_cap_and_neutral(self):
         state = Mapper().convert(*snapshot(speed=0.4, gear=1, brake=0))
@@ -48,7 +48,7 @@ class AccTests(unittest.TestCase):
 
     def test_invalid_and_non_live_rejected(self):
         for values in [dict(status=0), dict(status=1), dict(status=3), dict(speed=float("nan")),
-                       dict(brake=2), dict(left=99), dict(gear=-1)]:
+                       dict(left=99), dict(gear=-1)]:
             with self.assertRaises(ValueError):
                 Mapper().convert(*snapshot(**values))
 

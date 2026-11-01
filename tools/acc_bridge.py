@@ -75,23 +75,21 @@ class ExistingMap:
 
 
 class Mapper:
-    def __init__(self, brake_on=0.05, brake_off=0.02, stop_speed=0.5):
-        self.braking = False
-        self.brake_on, self.brake_off, self.stop_speed = brake_on, brake_off, stop_speed
+    def __init__(self, stop_speed=0.5):
+        self.stop_speed = stop_speed
 
     def convert(self, p, g):
         if g.status != 2:
             raise ValueError("ACC not LIVE (menu, pause or replay)")
-        if not math.isfinite(p.speed) or not math.isfinite(p.brake):
+        if not math.isfinite(p.speed):
             raise ValueError("invalid ACC telemetry")
-        if not 0 <= p.brake <= 1 or not 0 <= p.gear <= 20 or g.left not in (0, 1) or g.right not in (0, 1):
+        if not 0 <= p.gear <= 20 or g.left not in (0, 1) or g.right not in (0, 1):
             raise ValueError(f"unsupported ACC shared memory values/layout: brake={p.brake!r} "
                              f"gear={p.gear} left={g.left} right={g.right}")
-        self.braking = p.brake >= (self.brake_off if self.braking else self.brake_on)
         speed = abs(p.speed)
         speed = 0 if speed < self.stop_speed else min(speed, 200)
         turn = 3 if g.left and g.right else (1 if g.left else 2 if g.right else 0)
-        return State(turn, p.gear == 0, self.braking, math.floor(speed * 10 + 0.5))
+        return State(turn, p.gear == 0, False, math.floor(speed * 10 + 0.5))
 
 
 class Freshness:
@@ -124,17 +122,15 @@ def main():
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--port", help="ESP32 sender USB COM port")
     group.add_argument("--dry-run", action="store_true", help="read ACC and print only")
-    parser.add_argument("--brake-on", type=float, default=0.05)
-    parser.add_argument("--brake-off", type=float, default=0.02)
     parser.add_argument("--stop-speed", type=float, default=0.5)
     parser.add_argument("--duration", type=float, default=0, help="seconds; 0 runs until Ctrl+C")
     args = parser.parse_args()
-    if not (0 < args.brake_off < args.brake_on <= 1 and 0 <= args.stop_speed <= 5 and
+    if not (0 <= args.stop_speed <= 5 and
             math.isfinite(args.duration) and args.duration >= 0):
-        parser.error("require 0 < brake-off < brake-on <= 1, stop-speed 0..5, duration >= 0")
+        parser.error("require stop-speed 0..5, duration >= 0")
     if os.name != "nt":
         parser.error("ACC shared memory requires Windows")
-    mapper = Mapper(args.brake_on, args.brake_off, args.stop_speed)
+    mapper = Mapper(args.stop_speed)
     connection, maps = None, []
     freshness = Freshness()
     started = time.monotonic()
@@ -158,7 +154,7 @@ def main():
                 if not freshness.check(p, g, now):
                     raise ValueError("waiting for fresh ACC packets")
                 state = mapper.convert(p, g)
-                message = f"LIVE speed={state.speed / 10:.1f} gas={p.gas:.2f} brake={int(state.brake)} reverse={int(state.reverse)} turn={state.turn}"
+                message = f"LIVE speed={state.speed / 10:.1f} gas={p.gas:.2f} reverse={int(state.reverse)} turn={state.turn}"
                 if abs(p.speed) > 200:
                     message += " [speed capped at protocol limit 200 km/h]"
                 if connection:

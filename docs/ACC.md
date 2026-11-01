@@ -1,3 +1,9 @@
+# Cập nhật phạm vi 30/10/2026
+
+Bridge ACC hiện chỉ chuyển tốc độ, rẽ trái/phải, hazard và lùi. Không còn gửi
+phanh; bit3 vẫn bằng 0. Tốc độ chỉ dùng cho buzzer phía LED. LED có 5 slot
+Idle/Left/Right/Hazard/Reverse; xem IoT-Device/docs/VEHICLE_SLOTS.md và PINOUT.md.
+
 # Dùng MOZA R5 + ACC làm nguồn tín hiệu
 
 ## ACC có ảnh hưởng đến Hyundai i10 không?
@@ -35,11 +41,10 @@ Quan sát `LIVE speed=... brake=... reverse=... turn=...`:
 hiện chưa có trường ga riêng. Graphics có trường `Clock` trước hai xi-nhan;
 bridge đọc left/right tại offset 1492/1496 (layout ACC 1.8.12).
 
-- Đạp phanh: brake bật ở 5%, tắt dưới 2% để giảm rung quanh ngưỡng.
+- Phanh không được chuyển sang CAN và không điều khiển LED.
 - Tốc độ dưới 0.5 km/h chuyển thành 0 (xe dừng); độc lập tín hiệu phanh.
 - Gear ACC `0=R`, `1=N`, `2=số 1`; reverse chỉ bật khi R.
-- `turn`: 0=tắt, 1=trái, 2=phải, 3=hai phía/hazard. Đọc trực tiếp
-  `directionLightsLeft`/`directionLightsRight` của game; không suy từ đèn mưa,
+- `turn`: 0=tắvaihtsLeft`/`directionLightsRight` của game; không suy từ đèn mưa,
   flash đèn pha hoặc cờ vàng. Nếu xe/game không báo các trường này, turn vẫn 0;
   kiểm tra nút gán và đèn trên xe trong game trước.
 - ACC có thể chạy hơn 200 km/h: bridge giới hạn tại 200 và in cảnh báo vì
@@ -48,7 +53,7 @@ bridge đọc left/right tại offset 1492/1496 (layout ACC 1.8.12).
 Có thể chỉnh ngưỡng:
 
 ```powershell
-python tools/acc_bridge.py --dry-run --brake-on 0.08 --brake-off 0.03 --stop-speed 0.3
+python tools/acc_bridge.py --dry-run --stop-speed 0.3
 ```
 
 ## Phát qua ESP32

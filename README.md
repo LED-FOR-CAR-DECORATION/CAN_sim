@@ -1,3 +1,7 @@
+> Cập nhật 30/10/2026: LED không dùng phanh/STOP. ACC bridge chuyển tốc độ,
+> trái/phải, hazard và lùi; bit brake legacy chỉ còn phục vụ test tương thích.
+> Phía LED: TX21/RX22, buzzer18, LDR34. Xem IoT-Device/docs/PINOUT.md.
+
 # Kan_sim — bộ giả lập CAN ô tô trên bàn
 
 Mô phỏng rẽ trái/phải, hazard, xe dừng, số lùi và phanh bằng ESP32.
@@ -34,6 +38,9 @@ Firmware ESP32 mới phát CAN thực liên tục mỗi 100 ms.
 
 ## Phần cứng và nạp chương trình
 
+**[Xem sơ đồ cắm dây ESP32 ↔ module CAN](docs/WIRING.md)**: sơ đồ từng chân,
+bus hai node và chân riêng cho ESP32 điều khiển LED.
+
 - Hai ESP32 DevKit dùng chip ESP32 gốc (board `esp32dev`).
 - Hai transceiver SN65HVD230 tương thích logic 3.3 V, dây xoắn đôi.
 - USB cho từng board; không cấp 12 V ô tô vào ESP32.
@@ -44,8 +51,8 @@ Firmware ESP32 mới phát CAN thực liên tục mỗi 100 ms.
 |---|---|
 | 3V3 | VCC 3.3 V |
 | GND | GND |
-| GPIO5 (TX) | TXD / CTX |
-| GPIO4 (RX) | RXD / CRX |
+| GPIO18 (TX) | TXD / CTX |
+| GPIO19 (RX) | RXD / CRX |
 
 Nối CAN_H ↔ CAN_H, CAN_L ↔ CAN_L và chung GND giữa hai node.
 Mỗi đầu vật lý của bus có một điện trở 120 Ω giữa H/L. Kiểm tra điện trở
@@ -58,10 +65,10 @@ Cài PlatformIO CLI, sau đó:
 ```powershell
 pio run -e sender
 pio run -e receiver
-pio run -e sender -t upload --upload-port COM5
-pio run -e receiver -t upload --upload-port COM6
+pio run -e sender -t upload --upload-port COM10
+pio run -e receiver -t upload --upload-port COM8
 python -m pip install -r requirements.txt
-python tools/simulator.py --port COM5
+python tools/simulator.py --port COM10
 ```
 
 Thay COM5/COM6 theo cổng thực tế. Mở terminal khác xem node nhận:
@@ -126,8 +133,8 @@ in `STALE` và đánh dấu UNKNOWN; không suy diễn mất tín hiệu là xe 
 Lúc mới bật chưa có frame cũng là UNKNOWN.
 
 Repo `D:\SEP\IoT-Device` đã có CAN receiver trong `src/core/CarSignalService.cpp`
-và hiệu ứng trái/phải/hazard/phanh/lùi/dừng. Phía LED dùng TX GPIO21, RX GPIO22;
-phía sender vẫn TX GPIO5, RX GPIO4. Xem `IoT-Device/docs/CAN.md` để đấu nối và nạp
+và 5 slot Idle/Left/Right/Hazard/Reverse; tốc độ dùng cho buzzer. Phía LED dùng TX GPIO21, RX GPIO22;
+phía sender vẫn TX GPIO18, RX GPIO19. Xem `IoT-Device/docs/CAN.md` để đấu nối và nạp
 firmware LED. Environment receiver ở repo này chỉ kiểm tra bus, không điều khiển LED.
 
 ## Xác minh
