@@ -21,7 +21,18 @@ void printState(const VehicleState &s) {
 
 void command(String line) {
     line.trim(); line.toUpperCase();
-    if (line == "STATUS") { printState(state); return; }
+    if (line == "STATUS") {
+        printState(state);
+        twai_status_info_t st = {};
+        if (twai_get_status_info(&st) == ESP_OK) {
+            Serial.printf("TWAI st=%d tec=%lu rec=%lu failed=%lu errs=%lu msgs=%lu\n",
+                          (int)st.state, (unsigned long)st.tx_error_counter,
+                          (unsigned long)st.rx_error_counter, (unsigned long)st.tx_failed_count,
+                          (unsigned long)st.bus_error_count, (unsigned long)st.msgs_to_tx);
+        }
+        Serial.printf("PINS: TX(GPIO18)=%d RX(GPIO19)=%d\n", digitalRead(18), digitalRead(19));
+        return;
+    }
     if (line == "PAUSE") {
         transmitting = false; streaming = false;
         twai_clear_transmit_queue();
@@ -65,6 +76,7 @@ void command(String line) {
 
 void setup() {
     Serial.begin(115200);
+    pinMode(CAN_RX_PIN, INPUT_PULLUP);
     input.reserve(80);
     twai_general_config_t general = TWAI_GENERAL_CONFIG_DEFAULT(CAN_TX_PIN, CAN_RX_PIN, TWAI_MODE_NORMAL);
     general.alerts_enabled = TWAI_ALERT_BUS_OFF | TWAI_ALERT_BUS_RECOVERED |

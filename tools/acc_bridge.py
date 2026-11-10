@@ -3,6 +3,7 @@ import argparse
 import ctypes as c
 import math
 import os
+import sys
 import time
 
 from simulator import State
@@ -117,6 +118,15 @@ def serial_frame(state):
     return f"FRAME {state.speed} {flags}\n".encode("ascii")
 
 
+def safe_write(connection, data):
+    """Write to serial, return False if the port is gone."""
+    try:
+        connection.write(data)
+        return True
+    except Exception:
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     group = parser.add_mutually_exclusive_group(required=True)
@@ -157,8 +167,21 @@ def main():
                 message = f"LIVE speed={state.speed / 10:.1f} gas={p.gas:.2f} reverse={int(state.reverse)} turn={state.turn}"
                 if abs(p.speed) > 200:
                     message += " [speed capped at protocol limit 200 km/h]"
-                if connection:
-                    connection.write(serial_frame(state))
+                if connection and not safe_write(connection, serial_frame(state)):
+                    print("SERIAL LOST: reconnecting...", file=sys.stderr)
+                    try:
+                        connection.close()
+                    except Exception:
+                        pass
+                    time.sleep(2)
+                    try:
+                        import serial
+                        connection = serial.Serial(args.port, 115200, timeout=0, write_timeout=1)
+                        time.sleep(1)
+                        print("SERIAL RECONNECTED", file=sys.stderr)
+                    except Exception as re_exc:
+                        print(f"SERIAL RECONNECT FAILED: {re_exc}", file=sys.stderr)
+                        connection = None
             except (OSError, ValueError) as exc:
                 if isinstance(exc, OSError) or now - freshness.updated >= 0.75:
                     for mapping in maps:
@@ -166,16 +189,18 @@ def main():
                     maps = []
                 message = f"UNKNOWN / CAN paused: {exc}"
                 if connection:
-                    connection.write(b"PAUSE\n")
+                    safe_write(connection, b"PAUSE\n")
             if message != previous_message and now - last_log >= 0.5:
                 print(message)
                 previous_message, last_log = message, now
-            if connection and connection.in_waiting:
-                # Drain diagnostics continuously so USB output cannot stall the firmware.
-                output = connection.read(connection.in_waiting).decode(errors="replace")
-                for line in output.splitlines():
-                    if line.startswith(("ERR", "BUS", "STREAM")):
-                        print("ESP32:", line)
+            try:
+                if connection and connection.in_waiting:
+                    output = connection.read(connection.in_waiting).decode(errors="replace")
+                    for line in output.splitlines():
+                        if line.startswith(("ERR", "BUS", "STREAM")):
+                            print("ESP32:", line)
+            except Exception:
+                pass  # Port may have disconnected between check and read
             time.sleep(max(0, 0.1 - (time.monotonic() - now)))
     except KeyboardInterrupt:
         pass
@@ -184,10 +209,14 @@ def main():
             mapping.close()
         if connection:
             try:
-                connection.write(b"PAUSE\n")
+                safe_write(connection, b"PAUSE\n")
                 connection.flush()
-            finally:
+            except Exception:
+                pass
+            try:
                 connection.close()
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":
