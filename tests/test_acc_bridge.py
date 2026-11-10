@@ -8,11 +8,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from acc_bridge import Physics, Graphics, Mapper, Freshness, serial_frame
 
 
-def snapshot(speed=25.5, brake=0.0, gear=2, status=2, left=0, right=0):
+def snapshot(speed=25.5, brake=0.0, gear=2, status=2, left=0, right=0, rpm=1000):
     # Binary fixtures use documented offsets, independently of ctypes declarations.
     physics = bytearray(32)
     struct.pack_into("f", physics, 8, brake)
     struct.pack_into("i", physics, 16, gear)
+    struct.pack_into("i", physics, 20, rpm)
     struct.pack_into("f", physics, 28, speed)
     graphics = bytearray(1500)
     struct.pack_into("i", graphics, 4, status)
@@ -45,6 +46,21 @@ class AccTests(unittest.TestCase):
         self.assertFalse(state.reverse)
         self.assertFalse(state.brake)
         self.assertEqual(Mapper().convert(*snapshot(speed=280)).speed, 2000)
+
+    def test_engine_rpm_threshold(self):
+        mapper = Mapper(min_rpm=300)
+        # Engine running at 800 RPM:
+        state = mapper.convert(*snapshot(rpm=800))
+        self.assertIsNotNone(state)
+        # Engine off (RPM=0):
+        with self.assertRaises(ValueError):
+            mapper.convert(*snapshot(rpm=0))
+        # Engine cranking (< 300 RPM):
+        with self.assertRaises(ValueError):
+            mapper.convert(*snapshot(rpm=200))
+        # Disabled min_rpm (min_rpm=0 accepts RPM=0):
+        disabled = Mapper(min_rpm=0)
+        self.assertIsNotNone(disabled.convert(*snapshot(rpm=0)))
 
     def test_invalid_and_non_live_rejected(self):
         for values in [dict(status=0), dict(status=1), dict(status=3), dict(speed=float("nan")),

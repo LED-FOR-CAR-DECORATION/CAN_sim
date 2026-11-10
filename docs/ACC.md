@@ -43,6 +43,7 @@ bridge đọc left/right tại offset 1492/1496 (layout ACC 1.8.12).
 
 - Phanh không được chuyển sang CAN và không điều khiển LED.
 - Tốc độ dưới 0.5 km/h chuyển thành 0 (xe dừng); độc lập tín hiệu phanh.
+- Xe chỉ phát CAN khi động cơ đã khởi động/nổ máy (`RPM >= 300`, mặc định `--min-rpm 300`). Khi xe tắt máy, chết máy hoặc chưa đề nổ (`RPM < 300`), bridge tự động gửi `PAUSE` và ngừng phát CAN; receiver tự chuyển về `UNKNOWN` sau 500 ms (tương đương xe ngắt nguồn CAN). Có thể chỉnh `--min-rpm 0` để tắt lọc.
 - Gear ACC `0=R`, `1=N`, `2=số 1`; reverse chỉ bật khi R.
 - `turn`: 0=tắvaihtsLeft`/`directionLightsRight` của game; không suy từ đèn mưa,
   flash đèn pha hoặc cờ vàng. Nếu xe/game không báo các trường này, turn vẫn 0;

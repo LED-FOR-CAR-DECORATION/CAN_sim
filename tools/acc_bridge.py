@@ -76,8 +76,9 @@ class ExistingMap:
 
 
 class Mapper:
-    def __init__(self, stop_speed=0.5):
+    def __init__(self, stop_speed=0.5, min_rpm=300):
         self.stop_speed = stop_speed
+        self.min_rpm = min_rpm
 
     def convert(self, p, g):
         if g.status != 2:
@@ -87,6 +88,8 @@ class Mapper:
         if not 0 <= p.gear <= 20 or g.left not in (0, 1) or g.right not in (0, 1):
             raise ValueError(f"unsupported ACC shared memory values/layout: brake={p.brake!r} "
                              f"gear={p.gear} left={g.left} right={g.right}")
+        if self.min_rpm > 0 and p.rpm < self.min_rpm:
+            raise ValueError(f"engine off / not started (RPM={p.rpm} < {self.min_rpm})")
         speed = abs(p.speed)
         speed = 0 if speed < self.stop_speed else min(speed, 200)
         turn = 3 if g.left and g.right else (1 if g.left else 2 if g.right else 0)
@@ -133,14 +136,16 @@ def main():
     group.add_argument("--port", help="ESP32 sender USB COM port")
     group.add_argument("--dry-run", action="store_true", help="read ACC and print only")
     parser.add_argument("--stop-speed", type=float, default=0.5)
+    parser.add_argument("--min-rpm", type=int, default=300,
+                        help="minimum engine RPM to consider car started (default: 300; 0 disables)")
     parser.add_argument("--duration", type=float, default=0, help="seconds; 0 runs until Ctrl+C")
     args = parser.parse_args()
-    if not (0 <= args.stop_speed <= 5 and
+    if not (0 <= args.stop_speed <= 5 and args.min_rpm >= 0 and
             math.isfinite(args.duration) and args.duration >= 0):
-        parser.error("require stop-speed 0..5, duration >= 0")
+        parser.error("require stop-speed 0..5, min-rpm >= 0, duration >= 0")
     if os.name != "nt":
         parser.error("ACC shared memory requires Windows")
-    mapper = Mapper(args.stop_speed)
+    mapper = Mapper(args.stop_speed, args.min_rpm)
     connection, maps = None, []
     freshness = Freshness()
     started = time.monotonic()
@@ -164,7 +169,7 @@ def main():
                 if not freshness.check(p, g, now):
                     raise ValueError("waiting for fresh ACC packets")
                 state = mapper.convert(p, g)
-                message = f"LIVE speed={state.speed / 10:.1f} gas={p.gas:.2f} reverse={int(state.reverse)} turn={state.turn}"
+                message = f"LIVE RPM={p.rpm} speed={state.speed / 10:.1f} gas={p.gas:.2f} reverse={int(state.reverse)} turn={state.turn}"
                 if abs(p.speed) > 200:
                     message += " [speed capped at protocol limit 200 km/h]"
                 if connection and not safe_write(connection, serial_frame(state)):
